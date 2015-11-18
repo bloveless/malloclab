@@ -48,9 +48,9 @@ typedef struct block_meta {
   // int magic; // For debugging only. TODO: remove this in non-debug mode.
 } block_meta;
 
-#define SIZE_T_SIZE (ALIGN(sizeof(block_meta)))
+#define META_BLOCK_SIZE (ALIGN(sizeof(size_t)))
 
-block_meta *global_base = NULL;
+block_meta *meta_head = NULL;
 
 block_meta *find_free_block(block_meta **last, size_t size);
 block_meta *get_block_ptr(void *ptr);
@@ -70,24 +70,23 @@ int mm_init(void)
  */
 void *mm_malloc(size_t size)
 {
-  block_meta *block;
-  int newsize = ALIGN(size + SIZE_T_SIZE);
-  // void *p = mem_sbrk(newsize);
-
   if(size <= 0) {
     return NULL;
   }
 
-  if(!global_base) {
+  block_meta *block;
+  int newsize = ALIGN(size + META_BLOCK_SIZE);
+
+  if(!meta_head) {
     block = request_space(NULL, newsize);
     if(!block) {
       return NULL;
     }
 
-    global_base = block;
+    meta_head = block;
   }
   else {
-    block_meta *last = global_base;
+    block_meta *last = meta_head;
     block = find_free_block(&last, newsize);
     if(!block) {
       block = request_space(last, newsize);
@@ -100,7 +99,7 @@ void *mm_malloc(size_t size)
     }
   }
 
-  return (block+1);
+  return block;
 }
 
 /*
@@ -137,12 +136,9 @@ void *mm_realloc(void *ptr, size_t size)
   return newptr;
 }
 
-
-
-
 block_meta *find_free_block(block_meta **last, size_t size)
 {
-  block_meta *current = global_base;
+  block_meta *current = meta_head;
 
   while (current && !(current->free && current->size >= size)) {
     *last = current;
@@ -175,8 +171,5 @@ block_meta *request_space(block_meta* last, size_t size)
   block->next = NULL;
   block->free = 0;
   // block->magic = 0x12345678;
-  return block;
+  return request;
 }
-
-
-
