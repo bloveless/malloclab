@@ -1,6 +1,6 @@
 /*
  * mm-naive.c - The fastest, least memory-efficient malloc package.
- * 
+ *
  * In this naive approach, a block is allocated by simply incrementing
  * the brk pointer.  A block is pure payload. There are no headers or
  * footers.  Blocks are never coalesced or reused. Realloc is
@@ -42,9 +42,9 @@
 #define ALIGN(size) (((size) + (ALIGNMENT-1)) & ~0x7)
 
 typedef struct block_meta {
-  size_t size;
-  struct block_meta *next;
-  int free;
+         size_t      size;
+  struct block_meta* next;
+         int         free;
   // int magic; // For debugging only. TODO: remove this in non-debug mode.
 } block_meta;
 
@@ -56,7 +56,7 @@ block_meta *find_free_block(block_meta **last, size_t size);
 block_meta *get_block_ptr(void *ptr);
 block_meta *request_space(block_meta* last, size_t size);
 
-/* 
+/*
  * mm_init - initialize the malloc package.
  */
 int mm_init(void)
@@ -64,13 +64,13 @@ int mm_init(void)
   return 0;
 }
 
-/* 
+/*
  * mm_malloc - Allocate a block by incrementing the brk pointer.
  *     Always allocate a block whose size is a multiple of the alignment.
  */
-void *mm_malloc(size_t size)
+void* mm_malloc(size_t size)
 {
-  if(size <= 0) {
+  if (size <= 0) {
     return NULL;
   }
 
@@ -124,7 +124,7 @@ void *mm_realloc(void *ptr, size_t size)
     return NULL;
   }
 
-  copySize = *(size_t *)((char *)oldptr - SIZE_T_SIZE);
+  copySize = *(size_t *)((char *)oldptr - META_BLOCK_SIZE);
 
   if (size < copySize) {
     copySize = size;
@@ -136,40 +136,40 @@ void *mm_realloc(void *ptr, size_t size)
   return newptr;
 }
 
-block_meta *find_free_block(block_meta **last, size_t size)
-{
-  block_meta *current = meta_head;
+
+block_meta* find_free_block(block_meta** last, size_t size) {
+  block_meta* current = meta_head;
 
   while (current && !(current->free && current->size >= size)) {
-    *last = current;
+    *last   = current;
     current = current->next;
   }
 
   return current;
 }
 
-block_meta *get_block_ptr(void *ptr)
-{
+
+block_meta* get_block_ptr(void* ptr) {
   return (block_meta*)ptr - 1;
 }
 
-block_meta *request_space(block_meta* last, size_t size)
-{
-  block_meta *block;
-  block = mem_sbrk(0);
-  void *request = mem_sbrk(size);
-  // assert((void*)block == request); // Not thread safe.
-  if (request == (void*) -1) {
-    return NULL; // sbrk failed.
+
+block_meta* request_space(block_meta* lastMetaBlock, size_t size) {
+  block_meta* metaBlock = mem_sbrk(0);
+  void*       block     = mem_sbrk(size);
+
+  // Check if sbrk failed
+  if (block == (void*)(-1)) {
+    return NULL;
   }
 
-  if (last) { // NULL on first request.
-    last->next = block;
+  if (lastMetaBlock) {
+    lastMetaBlock->next = metaBlock
   }
 
-  block->size = size;
-  block->next = NULL;
-  block->free = 0;
-  // block->magic = 0x12345678;
-  return request;
+  metaBlock>size = size;
+  metaBlock>next = NULL;
+  metaBlock>free = 0;
+
+  return block;
 }
