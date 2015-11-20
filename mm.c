@@ -41,20 +41,21 @@
 /* rounds up to the nearest multiple of ALIGNMENT */
 #define ALIGN(size) (((size) + (ALIGNMENT-1)) & ~0x7)
 
-typedef struct block_meta {
+typedef struct meta_block {
   size_t size;
-  struct block_meta *next;
+  struct meta_block* next;
   int free;
-  int fill;
-} block_meta;
+  struct meta_block* prev;
+} meta_block;
 
 #define SIZE_T_SIZE (ALIGN(sizeof(size_t)))
 
-block_meta* global_base = NULL;
+meta_block* global_base = NULL;
+meta_block* global_tail = NULL;
 
-block_meta* find_free_block(size_t size);
-block_meta* get_block_ptr(void *ptr);
-block_meta* request_space(size_t size);
+meta_block* find_free_block(size_t size);
+meta_block* get_block_ptr(void *ptr);
+meta_block* request_space(size_t size);
 
 /* 
  * mm_init - initialize the malloc package.
@@ -62,6 +63,7 @@ block_meta* request_space(size_t size);
 int mm_init(void)
 {
   global_base = NULL;
+  global_tail = NULL;
   return 0;
 }
 
@@ -71,8 +73,8 @@ int mm_init(void)
  */
 void* mm_malloc(size_t size)
 {
-  int newsize = ALIGN(size + SIZE_T_SIZE);
-  block_meta* block;
+  int newsize = ALIGN(size + SIZE_T_SIZE + SIZE_T_SIZE);
+  meta_block* block;
 
   if(size <= 0) {
     return NULL;
@@ -85,6 +87,7 @@ void* mm_malloc(size_t size)
     }
 
     global_base = block;
+    global_tail = block;
   }
   else {
     block = find_free_block(newsize);
@@ -113,7 +116,7 @@ void mm_free(void *ptr)
     return;
   }
 
-  block_meta* block = get_block_ptr(ptr);
+  meta_block* block = (meta_block*)ptr - 1;
   block->free = 1;
 }
 
@@ -144,9 +147,9 @@ void* mm_realloc(void *ptr, size_t size)
   return newptr;
 }
 
-block_meta* find_free_block(size_t size)
+meta_block* find_free_block(size_t size)
 {
-  block_meta *current = global_base;
+  meta_block *current = global_base;
 
   while (current && !(current->free && current->size >= size)) {
     current = current->next;
@@ -155,14 +158,8 @@ block_meta* find_free_block(size_t size)
   return current;
 }
 
-block_meta* get_block_ptr(void *ptr)
+meta_block* request_space(size_t size)
 {
-  return (block_meta*)ptr - 1;
-}
-
-block_meta* request_space(size_t size)
-{
-  block_meta* block = (block_meta*) mem_sbrk(0);
   void* request = mem_sbrk(size);
 
   // assert((void*)block == request); // Not thread safe.
@@ -170,10 +167,10 @@ block_meta* request_space(size_t size)
     return NULL; // sbrk failed.
   }
 
+  meta_block* block = (meta_block*) request;
   block->size = size;
   block->next = NULL;
   block->free = 0;
-  // block->magic = 0x12345678;
 
   // printf("Created Block of Size %d\n", block->size);
 
