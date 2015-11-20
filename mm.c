@@ -72,7 +72,7 @@ int mm_init(void)
 void* mm_malloc(size_t size)
 {
   int newsize = ALIGN(size + SIZE_T_SIZE);
-  block_meta* block = mem_sbrk(newsize);
+  block_meta* block;
 
   if(size <= 0) {
     return NULL;
@@ -99,7 +99,9 @@ void* mm_malloc(size_t size)
     }
   }
 
-  return block;
+  // printf("Size: %d, Block Size: %d\n", size, block->size);
+
+  return block + 1;
 }
 
 /*
@@ -113,9 +115,6 @@ void mm_free(void *ptr)
 
   block_meta* block = get_block_ptr(ptr);
   block->free = 1;
-  printf("FREEING BLOCK OF SIZE %d\n", block->size);
-
-  exit(0);
 }
 
 /*
@@ -153,13 +152,6 @@ block_meta* find_free_block(size_t size)
     current = current->next;
   }
 
-  if(current) {
-    printf("Found free block\n");
-  }
-  else {
-    printf("\nDid not find a free block\n");
-  }
-
   return current;
 }
 
@@ -183,7 +175,7 @@ block_meta* request_space(size_t size)
   block->free = 0;
   // block->magic = 0x12345678;
 
-  printf("Created Block of Size %d\n", block->size);
+  // printf("Created Block of Size %d\n", block->size);
 
   return block;
 }
