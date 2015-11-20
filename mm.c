@@ -48,13 +48,13 @@ typedef struct block_meta {
   // int magic; // For debugging only. TODO: remove this in non-debug mode.
 } block_meta;
 
-#define META_BLOCK_SIZE (ALIGN(sizeof(size_t)))
+#define SIZE_T_SIZE (ALIGN(sizeof(size_t)))
 
-block_meta *meta_head = NULL;
+block_meta* global_base = NULL;
 
-block_meta *find_free_block(block_meta **last, size_t size);
-block_meta *get_block_ptr(void *ptr);
-block_meta *request_space(block_meta* last, size_t size);
+block_meta* find_free_block(block_meta **last, size_t size);
+block_meta* get_block_ptr(void *ptr);
+block_meta* request_space(block_meta* last, size_t size);
 
 /* 
  * mm_init - initialize the malloc package.
@@ -68,25 +68,27 @@ int mm_init(void)
  * mm_malloc - Allocate a block by incrementing the brk pointer.
  *     Always allocate a block whose size is a multiple of the alignment.
  */
-void *mm_malloc(size_t size)
+void* mm_malloc(size_t size)
 {
+  block_meta* block;
+  int newsize = ALIGN(size + SIZE_T_SIZE);
+  void *p = mem_sbrk(newsize);
+
   if(size <= 0) {
     return NULL;
   }
 
-  block_meta *block;
-  int newsize = ALIGN(size + META_BLOCK_SIZE);
-
-  if(!meta_head) {
+  if(global_base == NULL) {
     block = request_space(NULL, newsize);
+    printf("\n\nNEW BASE BLOCK\n\n`");
     if(!block) {
       return NULL;
     }
 
-    meta_head = block;
+    global_base = block;
   }
   else {
-    block_meta *last = meta_head;
+    block_meta* last = global_base;
     block = find_free_block(&last, newsize);
     if(!block) {
       block = request_space(last, newsize);
@@ -99,7 +101,7 @@ void *mm_malloc(size_t size)
     }
   }
 
-  return block;
+  return p;
 }
 
 /*
@@ -107,12 +109,13 @@ void *mm_malloc(size_t size)
  */
 void mm_free(void *ptr)
 {
+  // printf("FREE: %d\n", ptr);
 }
 
 /*
  * mm_realloc - Implemented simply in terms of mm_malloc and mm_free
  */
-void *mm_realloc(void *ptr, size_t size)
+void* mm_realloc(void *ptr, size_t size)
 {
   void *oldptr = ptr;
   void *newptr;
@@ -136,9 +139,9 @@ void *mm_realloc(void *ptr, size_t size)
   return newptr;
 }
 
-block_meta *find_free_block(block_meta **last, size_t size)
+block_meta* find_free_block(block_meta **last, size_t size)
 {
-  block_meta *current = meta_head;
+  block_meta *current = global_base;
 
   while (current && !(current->free && current->size >= size)) {
     *last = current;
@@ -148,16 +151,16 @@ block_meta *find_free_block(block_meta **last, size_t size)
   return current;
 }
 
-block_meta *get_block_ptr(void *ptr)
+block_meta* get_block_ptr(void *ptr)
 {
   return (block_meta*)ptr - 1;
 }
 
-block_meta *request_space(block_meta* last, size_t size)
+block_meta* request_space(block_meta* last, size_t size)
 {
-  block_meta *block;
+  block_meta* block;
   block = mem_sbrk(0);
-  void *request = mem_sbrk(size);
+  void* request = mem_sbrk(size);
   // assert((void*)block == request); // Not thread safe.
   if (request == (void*) -1) {
     return NULL; // sbrk failed.
@@ -171,5 +174,5 @@ block_meta *request_space(block_meta* last, size_t size)
   block->next = NULL;
   block->free = 0;
   // block->magic = 0x12345678;
-  return request;
+  return block;
 }
