@@ -50,7 +50,7 @@ typedef struct meta_block {
 
 #define SIZE_T_SIZE (ALIGN(sizeof(size_t)))
 
-meta_block* global_base = NULL;
+meta_block* global_head = NULL;
 meta_block* global_tail = NULL;
 
 meta_block* find_free_block(size_t size);
@@ -62,7 +62,7 @@ meta_block* request_space(size_t size);
  */
 int mm_init(void)
 {
-  global_base = NULL;
+  global_head = NULL;
   global_tail = NULL;
   return 0;
 }
@@ -73,21 +73,18 @@ int mm_init(void)
  */
 void* mm_malloc(size_t size)
 {
-  int newsize = ALIGN(size + SIZE_T_SIZE + SIZE_T_SIZE);
+  int newsize = ALIGN(size + sizeof(meta_block));
   meta_block* block;
 
   if(size <= 0) {
     return NULL;
   }
 
-  if(global_base == NULL) {
+  if(global_head == NULL) {
     block = request_space(newsize);
     if(!block) {
       return NULL;
     }
-
-    global_base = block;
-    global_tail = block;
   }
   else {
     block = find_free_block(newsize);
@@ -101,8 +98,6 @@ void* mm_malloc(size_t size)
       block->free = 0;
     }
   }
-
-  // printf("Size: %d, Block Size: %d\n", size, block->size);
 
   return block + 1;
 }
@@ -118,27 +113,68 @@ void mm_free(void *ptr)
 
   meta_block* block = (meta_block*)ptr - 1;
   block->free = 1;
+
+  meta_block* prev_block = block->prev;
+  meta_block* next_block = block->next;
+
+  if(next_block && next_block->free) {
+    block->size = block->size + next_block->size;
+    block->next = next_block->next;
+  }
+
+  if(prev_block && prev_block->free) {
+    prev_block->size = prev_block->size + block->size;
+    prev_block->next = block->next;
+  }
+
 }
 
 /*
  * mm_realloc - Implemented simply in terms of mm_malloc and mm_free
  */
-void* mm_realloc(void *ptr, size_t size)
+void* mm_realloc(void *ptr, size_t new_size)
 {
   void *oldptr = ptr;
   void *newptr;
   size_t copySize;
 
-  newptr = mm_malloc(size);
+  newptr = mm_malloc(new_size);
+
+  // If new size is 0 then just free the space
+  if(new_size <= 0) {
+    free(oldptr);
+    return 0;
+  }
+
+  // If the pointer is null then this is just a malloc
+  if(ptr == NULL) {
+    return malloc(new_size);
+  }
+
+
+
+
+
+
+
+  /*
+   * THIS IS WHERE I IS, YO
+   */
+
+
+
+
 
   if (newptr == NULL) {
     return NULL;
   }
 
-  copySize = *(size_t *)((char *)oldptr - SIZE_T_SIZE);
+  meta_block* old_block = (meta_block*) oldptr - 1;
+  copySize = old_block->size;
+  // copySize = *(size_t *)((char *)oldptr - sizeof(meta_block));
 
-  if (size < copySize) {
-    copySize = size;
+  if (new_size < copySize) {
+    copySize = new_size;
   }
 
   memcpy(newptr, oldptr, copySize);
@@ -149,7 +185,7 @@ void* mm_realloc(void *ptr, size_t size)
 
 meta_block* find_free_block(size_t size)
 {
-  meta_block *current = global_base;
+  meta_block *current = global_head;
 
   while (current && !(current->free && current->size >= size)) {
     current = current->next;
@@ -170,9 +206,21 @@ meta_block* request_space(size_t size)
   meta_block* block = (meta_block*) request;
   block->size = size;
   block->next = NULL;
+  // save the current global tail to the block as the previous block
+  block->prev = global_tail;
   block->free = 0;
 
-  // printf("Created Block of Size %d\n", block->size);
+  if(!global_head) {
+    // first time through create the head
+    global_head = block;
+  } else {
+    // if global tail is not null link back to the current block
+    // so we get a doubly linked list
+    global_tail->next = block;
+  }
+
+  // reset the global tail to the current block
+  global_tail = block;
 
   return block;
 }
