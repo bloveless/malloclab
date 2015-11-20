@@ -1,13 +1,22 @@
 /*
- * mm-naive.c - The fastest, least memory-efficient malloc package.
+ * mm.c - Malloc implementation using segregated fits with address-ordered
+ *        explicit linked lists and reallocation heuristics
  *
- * In this naive approach, a block is allocated by simply incrementing
- * the brk pointer.  A block is pure payload. There are no headers or
- * footers.  Blocks are never coalesced or reused. Realloc is
- * implemented directly using mm_malloc and mm_free.
+ * Each block is wrapped in a 4-byte header and a 4-byte footer. Free blocks
+ * are stored in one of many linked lists segregated by block size. The n-th
+ * list contains blocks with a byte size that spans 2^n to 2^(n+1)-1. Within
+ * each list, blocks are sorted by memory address in ascending order.
+ * Coalescing is performed immediately after each heap extension and free
+ * operation. Reallocation is performed in place, using a buffer and a
+ * reallocation bit to ensure the availability of future block expansion.
  *
- * NOTE TO STUDENTS: Replace this header comment with your own header
- * comment that gives a high level description of your solution.
+ * Header entries consist of the block size (all 32 bits), reallocation tag
+ * (second-last bit), and allocation bit (last bit).
+ *
+ *
+ * He (Henry) Tian
+ * Section 3
+ * 5/13/13
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -18,21 +27,20 @@
 #include "mm.h"
 #include "memlib.h"
 
-/*********************************************************
- * NOTE TO STUDENTS: Before you do anything else, please
- * provide your identifying information in the following struct.
- ********************************************************/
- team_t team = {
-    /* Team name */
-  "349",
-    /* First member's full name */
-  "Brennon Loveless",
-    /* First member's UID */
-  "u0550904",
-    /* Second member's full name (leave blank if none) */
-  "Brandon Sara",
-    /* Second member's UID (leave blank if none) */
-  "u0516100"
+/*
+ * Team identification
+ */
+team_t team = {
+	/* Team name */
+	"He (Henry) Tian",
+	/* First member's full name */
+	"He Tian",
+	/* First member's NYU NetID*/
+	"",
+	/* Second member's full name (leave blank if none) */
+	"",
+	/* Second member's email address (leave blank if none) */
+	""
 };
 
 /*
