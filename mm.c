@@ -18,6 +18,8 @@
 #include "mm.h"
 #include "memlib.h"
 
+
+
 /*********************************************************
  * NOTE TO STUDENTS: Before you do anything else, please
  * provide your identifying information in the following struct.
@@ -35,32 +37,37 @@
   "u0516100"
 };
 
+
+
 /* single word (4) or double word (8) alignment */
 #define ALIGNMENT 8
 
 /* rounds up to the nearest multiple of ALIGNMENT */
 #define ALIGN(size) (((size) + (ALIGNMENT-1)) & ~0x7)
 
+
 typedef struct block_meta {
-         size_t      size;
+  size_t             size;
   struct block_meta* next;
-         int         free;
+  int                free;
   // int magic; // For debugging only. TODO: remove this in non-debug mode.
 } block_meta;
 
+
 #define META_BLOCK_SIZE (ALIGN(sizeof(size_t)))
 
-block_meta *meta_head = NULL;
 
-block_meta *find_free_block(block_meta **last, size_t size);
-block_meta *get_block_ptr(void *ptr);
-block_meta *request_space(block_meta* last, size_t size);
+
+block_meta* g_headMetaBlock = NULL;
+
+block_meta* find_free_block(block_meta** last, size_t size);
+block_meta* get_block_ptr(void* ptr);
+block_meta* request_space(block_meta* last, size_t size);
 
 /*
  * mm_init - initialize the malloc package.
  */
-int mm_init(void)
-{
+int mm_init(void) {
   return 0;
 }
 
@@ -68,52 +75,58 @@ int mm_init(void)
  * mm_malloc - Allocate a block by incrementing the brk pointer.
  *     Always allocate a block whose size is a multiple of the alignment.
  */
-void* mm_malloc(size_t size)
-{
+void* mm_malloc(size_t size) {
   if (size <= 0) {
     return NULL;
   }
 
-  block_meta *block;
-  int newsize = ALIGN(size + META_BLOCK_SIZE);
 
-  if(!meta_head) {
+  void* block;
+  int   newsize = ALIGN(size + META_BLOCK_SIZE);
+
+
+  if(!g_headMetaBlock) {
     block = request_space(NULL, newsize);
+
     if(!block) {
       return NULL;
     }
 
-    meta_head = block;
+    g_headMetaBlock = block;
+
+    return block;
   }
-  else {
-    block_meta *last = meta_head;
-    block = find_free_block(&last, newsize);
+
+
+  block_meta* lastMetaBlock    = g_headMetaBlock;
+  block_meta* currentBlockMeta = find_free_block(&lastMetaBlock, newsize);
+
+  if(!block) {
+    block = request_space(lastMetaBlock, newsize);
+
     if(!block) {
-      block = request_space(last, newsize);
-      if(!block) {
-        return NULL;
-      }
+      return NULL;
     }
-    else {
-      block->free = 0;
-    }
+  } else {
+    block->free = 0;
   }
 
   return block;
 }
 
+
 /*
  * mm_free - Freeing a block does nothing.
  */
-void mm_free(void *ptr)
-{
+void mm_free(void *ptr) {
+  // TODO: Implement
 }
+
 
 /*
  * mm_realloc - Implemented simply in terms of mm_malloc and mm_free
  */
-void *mm_realloc(void *ptr, size_t size)
-{
+void *mm_realloc(void *ptr, size_t size) {
   void *oldptr = ptr;
   void *newptr;
   size_t copySize;
@@ -138,7 +151,7 @@ void *mm_realloc(void *ptr, size_t size)
 
 
 block_meta* find_free_block(block_meta** last, size_t size) {
-  block_meta* current = meta_head;
+  block_meta* current = g_headMetaBlock;
 
   while (current && !(current->free && current->size >= size)) {
     *last   = current;
