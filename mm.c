@@ -45,22 +45,23 @@ typedef struct block_meta {
   size_t size;
   struct block_meta *next;
   int free;
-  // int magic; // For debugging only. TODO: remove this in non-debug mode.
+  int fill;
 } block_meta;
 
 #define SIZE_T_SIZE (ALIGN(sizeof(size_t)))
 
 block_meta* global_base = NULL;
 
-block_meta* find_free_block(block_meta **last, size_t size);
+block_meta* find_free_block(size_t size);
 block_meta* get_block_ptr(void *ptr);
-block_meta* request_space(block_meta* last, size_t size);
+block_meta* request_space(size_t size);
 
 /* 
  * mm_init - initialize the malloc package.
  */
 int mm_init(void)
 {
+  global_base = NULL;
   return 0;
 }
 
@@ -70,17 +71,15 @@ int mm_init(void)
  */
 void* mm_malloc(size_t size)
 {
-  block_meta* block;
   int newsize = ALIGN(size + SIZE_T_SIZE);
-  void *p = mem_sbrk(newsize);
+  block_meta* block = mem_sbrk(newsize);
 
   if(size <= 0) {
     return NULL;
   }
 
   if(global_base == NULL) {
-    block = request_space(NULL, newsize);
-    printf("\n\nNEW BASE BLOCK\n\n`");
+    block = request_space(newsize);
     if(!block) {
       return NULL;
     }
@@ -88,10 +87,9 @@ void* mm_malloc(size_t size)
     global_base = block;
   }
   else {
-    block_meta* last = global_base;
-    block = find_free_block(&last, newsize);
+    block = find_free_block(newsize);
     if(!block) {
-      block = request_space(last, newsize);
+      block = request_space(newsize);
       if(!block) {
         return NULL;
       }
@@ -101,7 +99,7 @@ void* mm_malloc(size_t size)
     }
   }
 
-  return p;
+  return block;
 }
 
 /*
@@ -109,7 +107,15 @@ void* mm_malloc(size_t size)
  */
 void mm_free(void *ptr)
 {
-  // printf("FREE: %d\n", ptr);
+  if(!ptr) {
+    return;
+  }
+
+  block_meta* block = get_block_ptr(ptr);
+  block->free = 1;
+  printf("FREEING BLOCK OF SIZE %d\n", block->size);
+
+  exit(0);
 }
 
 /*
@@ -139,13 +145,19 @@ void* mm_realloc(void *ptr, size_t size)
   return newptr;
 }
 
-block_meta* find_free_block(block_meta **last, size_t size)
+block_meta* find_free_block(size_t size)
 {
   block_meta *current = global_base;
 
   while (current && !(current->free && current->size >= size)) {
-    *last = current;
     current = current->next;
+  }
+
+  if(current) {
+    printf("Found free block\n");
+  }
+  else {
+    printf("\nDid not find a free block\n");
   }
 
   return current;
@@ -156,23 +168,22 @@ block_meta* get_block_ptr(void *ptr)
   return (block_meta*)ptr - 1;
 }
 
-block_meta* request_space(block_meta* last, size_t size)
+block_meta* request_space(size_t size)
 {
-  block_meta* block;
-  block = mem_sbrk(0);
+  block_meta* block = (block_meta*) mem_sbrk(0);
   void* request = mem_sbrk(size);
+
   // assert((void*)block == request); // Not thread safe.
   if (request == (void*) -1) {
     return NULL; // sbrk failed.
-  }
-
-  if (last) { // NULL on first request.
-    last->next = block;
   }
 
   block->size = size;
   block->next = NULL;
   block->free = 0;
   // block->magic = 0x12345678;
+
+  printf("Created Block of Size %d\n", block->size);
+
   return block;
 }
