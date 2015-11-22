@@ -163,7 +163,7 @@ void* mm_realloc(void *old_ptr, size_t new_size)
     free_block->size = new_size;
 
     // and copy the data from the old block into the new block
-    memcpy((free_block+1), (((meta_block*)old_ptr) + 1), new_size);
+    memcpy((free_block+1), (old_block + 1), new_size);
 
     // free up the old pointer
     mm_free(old_block + 1);
@@ -174,8 +174,10 @@ void* mm_realloc(void *old_ptr, size_t new_size)
     // create a new block
     void* ptr = mm_malloc(new_size);
 
+    // printf("New Size: %d\n", new_size);
+
     // then copy the data in place
-    memcpy(ptr, (((meta_block*)old_ptr) + 1), new_size);
+    memcpy(ptr, (old_block + 1), new_size);
 
     // free up the old pointer
     mm_free(old_block + 1);
