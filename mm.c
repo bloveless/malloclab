@@ -103,7 +103,7 @@ void* mm_malloc(size_t size)
 }
 
 /*
- * mm_free - Freeing a block does nothing.
+ * mm_free - Free a block and coalesce with previous and next block
  */
 void mm_free(void *ptr)
 {
@@ -132,28 +132,56 @@ void mm_free(void *ptr)
 /*
  * mm_realloc - Implemented simply in terms of mm_malloc and mm_free
  */
-void* mm_realloc(void *ptr, size_t new_size)
+void* mm_realloc(void *old_ptr, size_t new_size)
 {
-  void *oldptr = ptr;
-  void *newptr;
-  size_t copySize;
-
-  newptr = mm_malloc(new_size);
+  meta_block* old_block = (meta_block*) old_ptr - 1;
 
   // If new size is 0 then just free the space
   if(new_size <= 0) {
-    free(oldptr);
+    mm_free(old_ptr);
     return 0;
   }
 
   // If the pointer is null then this is just a malloc
-  if(ptr == NULL) {
-    return malloc(new_size);
+  if(old_ptr == NULL) {
+    return mm_malloc(new_size);
   }
 
+  // if the size is the same as the old size then just return the orig pointer.
+  if(old_block->size == new_size) {
+    return old_ptr;
+  }
 
+  // Otherwise, we will search for a new block that is
+  // the big enough and use that spot
+  meta_block* free_block = find_free_block(new_size);
 
+  // found a spot that is big enough
+  if(free_block) {
+    // mark the spot as full
+    free_block->free = 0;
+    free_block->size = new_size;
 
+    // and copy the data from the old block into the new block
+    memcpy((free_block+1), (((meta_block*)old_ptr) + 1), new_size);
+
+    // free up the old pointer
+    mm_free(old_block + 1);
+
+    return free_block + 1;
+  }
+  else {
+    // create a new block
+    void* ptr = mm_malloc(new_size);
+
+    // then copy the data in place
+    memcpy(ptr, (((meta_block*)old_ptr) + 1), new_size);
+
+    // free up the old pointer
+    mm_free(old_block + 1);
+
+    return ptr;
+  }
 
 
 
@@ -164,12 +192,12 @@ void* mm_realloc(void *ptr, size_t new_size)
 
 
 
+  /*
 
   if (newptr == NULL) {
     return NULL;
   }
 
-  meta_block* old_block = (meta_block*) oldptr - 1;
   copySize = old_block->size;
   // copySize = *(size_t *)((char *)oldptr - sizeof(meta_block));
 
@@ -181,6 +209,8 @@ void* mm_realloc(void *ptr, size_t new_size)
   mm_free(oldptr);
 
   return newptr;
+
+   */
 }
 
 meta_block* find_free_block(size_t size)
