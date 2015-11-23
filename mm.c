@@ -63,8 +63,11 @@ int count_blocks();
  */
 int mm_init(void)
 {
-  global_head = NULL;
-  global_tail = NULL;
+  if(mem_heap_hi() < mem_heap_lo())
+  {
+    global_head = NULL;
+    global_tail = NULL;
+  }
   return 0;
 }
 
@@ -135,6 +138,7 @@ void mm_free(void *ptr)
 void* mm_realloc(void *old_ptr, size_t new_size)
 {
   meta_block* old_block = (meta_block*) old_ptr - 1;
+  int old_size = old_block->size;
 
   // If new size is 0 then just free the space
   if(new_size <= 0) {
@@ -148,7 +152,7 @@ void* mm_realloc(void *old_ptr, size_t new_size)
   }
 
   // if the size is the same as the old size then just return the orig pointer.
-  if(old_block->size == new_size) {
+  if(old_block->size >= new_size) {
     return old_ptr;
   }
 
@@ -160,10 +164,9 @@ void* mm_realloc(void *old_ptr, size_t new_size)
   if(free_block) {
     // mark the spot as full
     free_block->free = 0;
-    free_block->size = new_size;
 
     // and copy the data from the old block into the new block
-    memcpy((free_block+1), (old_block + 1), new_size);
+    memcpy((free_block+1), (old_block + 1), old_size);
 
     // free up the old pointer
     mm_free(old_block + 1);
@@ -174,8 +177,10 @@ void* mm_realloc(void *old_ptr, size_t new_size)
     // create a new block
     void* ptr = mm_malloc(new_size);
 
-    // then copy the data in place
-    memcpy(ptr, (old_block + 1), new_size);
+    if(ptr != NULL) {
+      // then copy the data in place
+      memcpy(ptr, (old_block + 1), old_size);
+    }
 
     // free up the old pointer
     mm_free(old_block + 1);
