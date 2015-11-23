@@ -1,6 +1,6 @@
 /*
  * mm-naive.c - The fastest, least memory-efficient malloc package.
- * 
+ *
  * In this naive approach, a block is allocated by simply incrementing
  * the brk pointer.  A block is pure payload. There are no headers or
  * footers.  Blocks are never coalesced or reused. Realloc is
@@ -54,10 +54,11 @@ meta_block* global_head = NULL;
 meta_block* global_tail = NULL;
 
 meta_block* find_free_block(size_t size);
-meta_block* get_block_ptr(void *ptr);
 meta_block* request_space(size_t size);
 
-/* 
+int count_blocks();
+
+/*
  * mm_init - initialize the malloc package.
  */
 int mm_init(void)
@@ -67,7 +68,7 @@ int mm_init(void)
   return 0;
 }
 
-/* 
+/*
  * mm_malloc - Allocate a block by incrementing the brk pointer.
  *     Always allocate a block whose size is a multiple of the alignment.
  */
@@ -126,7 +127,6 @@ void mm_free(void *ptr)
     prev_block->size = prev_block->size + block->size;
     prev_block->next = block->next;
   }
-
 }
 
 /*
@@ -174,8 +174,6 @@ void* mm_realloc(void *old_ptr, size_t new_size)
     // create a new block
     void* ptr = mm_malloc(new_size);
 
-    // printf("New Size: %d\n", new_size);
-
     // then copy the data in place
     memcpy(ptr, (old_block + 1), new_size);
 
@@ -184,35 +182,6 @@ void* mm_realloc(void *old_ptr, size_t new_size)
 
     return ptr;
   }
-
-
-
-  /*
-   * THIS IS WHERE I IS, YO
-   */
-
-
-
-
-  /*
-
-  if (newptr == NULL) {
-    return NULL;
-  }
-
-  copySize = old_block->size;
-  // copySize = *(size_t *)((char *)oldptr - sizeof(meta_block));
-
-  if (new_size < copySize) {
-    copySize = new_size;
-  }
-
-  memcpy(newptr, oldptr, copySize);
-  mm_free(oldptr);
-
-  return newptr;
-
-   */
 }
 
 meta_block* find_free_block(size_t size)
@@ -255,4 +224,20 @@ meta_block* request_space(size_t size)
   global_tail = block;
 
   return block;
+}
+
+int count_blocks()
+{
+  meta_block* current = global_head;
+  int count = 0;
+
+  if(current != NULL) {
+    count = 1;
+    while (current->next != NULL) {
+      count++;
+      current = current->next;
+    }
+  }
+
+  return count;
 }
