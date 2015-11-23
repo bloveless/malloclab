@@ -122,12 +122,14 @@ void mm_free(void *ptr)
   meta_block* next_block = block->next;
 
   if(next_block && next_block->free) {
-    block->size = block->size + next_block->size;
+    // when coalescing the new size will include the meta block of the next block
+    block->size = block->size + next_block->size + sizeof(meta_block);
     block->next = next_block->next;
   }
 
   if(prev_block && prev_block->free) {
-    prev_block->size = prev_block->size + block->size;
+    // when coalescing the new size will include the meta block of the previous block
+    prev_block->size = prev_block->size + block->size + sizeof(meta_block);
     prev_block->next = block->next;
   }
 }
@@ -138,7 +140,6 @@ void mm_free(void *ptr)
 void* mm_realloc(void *old_ptr, size_t new_size)
 {
   meta_block* old_block = (meta_block*) old_ptr - 1;
-  int old_size = old_block->size;
 
   // If new size is 0 then just free the space
   if(new_size <= 0) {
@@ -152,7 +153,7 @@ void* mm_realloc(void *old_ptr, size_t new_size)
   }
 
   // if the size is the same as the old size then just return the orig pointer.
-  if(old_block->size >= new_size) {
+  if(old_block->size == new_size) {
     return old_ptr;
   }
 
@@ -166,7 +167,7 @@ void* mm_realloc(void *old_ptr, size_t new_size)
     free_block->free = 0;
 
     // and copy the data from the old block into the new block
-    memcpy((free_block+1), (old_block + 1), old_size);
+    memcpy((free_block+1), (old_block + 1), old_block->size);
 
     // free up the old pointer
     mm_free(old_block + 1);
@@ -179,7 +180,7 @@ void* mm_realloc(void *old_ptr, size_t new_size)
 
     if(ptr != NULL) {
       // then copy the data in place
-      memcpy(ptr, (old_block + 1), old_size);
+      memcpy(ptr, (old_block + 1), old_block->size);
     }
 
     // free up the old pointer
