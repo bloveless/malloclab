@@ -48,8 +48,6 @@ typedef struct meta_block {
   struct meta_block* prev;
 } meta_block;
 
-#define SIZE_T_SIZE (ALIGN(sizeof(size_t)))
-
 meta_block* global_head = NULL;
 meta_block* global_tail = NULL;
 
@@ -166,8 +164,11 @@ void* mm_realloc(void *old_ptr, size_t new_size)
     // mark the spot as full
     free_block->free = 0;
 
+    // only copy the smallest of the two
+    int copy_size = (old_block->size < free_block->size)? old_block->size : free_block->size;
+
     // and copy the data from the old block into the new block
-    memcpy((free_block+1), (old_block + 1), old_block->size);
+    memcpy((free_block+1), (old_block + 1), copy_size);
 
     // free up the old pointer
     mm_free(old_block + 1);
@@ -178,13 +179,18 @@ void* mm_realloc(void *old_ptr, size_t new_size)
     // create a new block
     void* ptr = mm_malloc(new_size);
 
+    meta_block* new_block = (meta_block*) ptr;
+
+    // only copy the smallest of the two
+    int copy_size = (old_block->size < new_block->size)? old_block->size : new_block->size;
+
     if(ptr != NULL) {
       // then copy the data in place
-      memcpy(ptr, (old_block + 1), old_block->size);
+      memcpy(ptr, (old_block + 1), copy_size);
     }
 
     // free up the old pointer
-    mm_free(old_block + 1);
+    mm_free(old_ptr);
 
     return ptr;
   }
