@@ -75,7 +75,6 @@ int mm_init(void)
  */
 void* mm_malloc(size_t size)
 {
-  int newsize = ALIGN(size + sizeof(meta_block));
   meta_block* block;
 
   if(size <= 0) {
@@ -83,15 +82,15 @@ void* mm_malloc(size_t size)
   }
 
   if(global_head == NULL) {
-    block = request_space(newsize);
+    block = request_space(size);
     if(!block) {
       return NULL;
     }
   }
   else {
-    block = find_free_block(newsize);
+    block = find_free_block(size);
     if(!block) {
-      block = request_space(newsize);
+      block = request_space(size);
       if(!block) {
         return NULL;
       }
@@ -151,9 +150,18 @@ void* mm_realloc(void *old_ptr, size_t new_size)
   }
 
   // if the size is the same as the old size then just return the orig pointer.
-  if(old_block->size == new_size) {
+  if(old_block->size >= new_size) {
     return old_ptr;
   }
+
+  void* new_ptr = mm_malloc(new_size);
+  memcpy(new_ptr, old_ptr, new_size);
+
+  mm_free(old_ptr);
+
+  return new_ptr;
+
+
 
   // Otherwise, we will search for a new block that is
   // the big enough and use that spot
@@ -165,13 +173,13 @@ void* mm_realloc(void *old_ptr, size_t new_size)
     free_block->free = 0;
 
     // only copy the smallest of the two
-    int copy_size = (old_block->size < free_block->size)? old_block->size : free_block->size;
+    int copy_size = (old_block->size < new_size)? old_block->size : new_size;
 
     // and copy the data from the old block into the new block
     memcpy((free_block+1), (old_block + 1), copy_size);
 
     // free up the old pointer
-    mm_free(old_block + 1);
+    mm_free(old_ptr);
 
     return free_block + 1;
   }
@@ -179,14 +187,9 @@ void* mm_realloc(void *old_ptr, size_t new_size)
     // create a new block
     void* ptr = mm_malloc(new_size);
 
-    meta_block* new_block = (meta_block*) ptr;
-
-    // only copy the smallest of the two
-    int copy_size = (old_block->size < new_block->size)? old_block->size : new_block->size;
-
     if(ptr != NULL) {
       // then copy the data in place
-      memcpy(ptr, (old_block + 1), copy_size);
+      memcpy(ptr, (old_block + 1), new_size);
     }
 
     // free up the old pointer
@@ -209,7 +212,7 @@ meta_block* find_free_block(size_t size)
 
 meta_block* request_space(size_t size)
 {
-  void* request = mem_sbrk(size);
+  void *request = mem_sbrk(ALIGN(size + sizeof(meta_block)));
 
   // assert((void*)block == request); // Not thread safe.
   if (request == (void*) -1) {
