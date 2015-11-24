@@ -75,21 +75,27 @@ void* mm_malloc(size_t size)
 {
   meta_block* block;
 
+  // Size is less than or equal to zero... what!
   if(size <= 0) {
     return NULL;
   }
 
   block = find_free_block(size);
+  // block will be null if no block has been created yet,
+  // or if there is no block that is the correct size
   if(!block) {
+    // we have to create space with sbrk
     block = request_space(size);
     if(!block) {
       return NULL;
     }
   }
   else {
+    // set the found block to used
     block->free = 0;
   }
 
+  // return the pointer to the memory. Not the header block
   return block + 1;
 }
 
@@ -102,20 +108,25 @@ void mm_free(void *ptr)
     return;
   }
 
+  // set the block to free
   meta_block* block = (meta_block*)ptr - 1;
   block->free = 1;
 
-  if(block->prev && block->prev->free)
-  {
-    block->prev->next = block->next;
+  /*
+   * coalesce
+   */
+
+  // merge this block with the previous block, if that block is free
+  if(block->prev && block->prev->free) {
     if(block->next) {
       block->next->prev = block->prev;
     }
     block->prev->size = block->prev->size + block->size;
+    block->prev->next = block->next;
   }
 
-  if(block->next && block->next->free)
-  {
+  // merge this block with the next block, if that block is free
+  if(block->next && block->next->free) {
     if(block->next->next) {
       block->next->next->prev = block;
     }
@@ -198,7 +209,6 @@ meta_block* request_space(size_t size)
 {
   void *request = mem_sbrk(ALIGN(size + sizeof(meta_block)));
 
-  // assert((void*)block == request); // Not thread safe.
   if (request == (void*) -1) {
     return NULL; // sbrk failed.
   }
