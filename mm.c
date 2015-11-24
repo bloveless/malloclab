@@ -55,6 +55,7 @@ meta_block* find_free_block(size_t size);
 meta_block* request_space(size_t size);
 
 int count_blocks();
+void print_heap();
 
 /*
  * mm_init - initialize the malloc package.
@@ -81,23 +82,15 @@ void* mm_malloc(size_t size)
     return NULL;
   }
 
-  if(global_head == NULL) {
+  block = find_free_block(size);
+  if(!block) {
     block = request_space(size);
     if(!block) {
       return NULL;
     }
   }
   else {
-    block = find_free_block(size);
-    if(!block) {
-      block = request_space(size);
-      if(!block) {
-        return NULL;
-      }
-    }
-    else {
-      block->free = 0;
-    }
+    block->free = 0;
   }
 
   return block + 1;
@@ -115,19 +108,22 @@ void mm_free(void *ptr)
   meta_block* block = (meta_block*)ptr - 1;
   block->free = 1;
 
-  meta_block* prev_block = block->prev;
-  meta_block* next_block = block->next;
-
-  if(next_block && next_block->free) {
-    // when coalescing the new size will include the meta block of the next block
-    block->size = block->size + next_block->size + sizeof(meta_block);
-    block->next = next_block->next;
+  if(block->prev && block->prev->free)
+  {
+    block->prev->next = block->next;
+    if(block->next) {
+      block->next->prev = block->prev;
+    }
+    block->prev->size = block->prev->size + block->size;
   }
 
-  if(prev_block && prev_block->free) {
-    // when coalescing the new size will include the meta block of the previous block
-    prev_block->size = prev_block->size + block->size + sizeof(meta_block);
-    prev_block->next = block->next;
+  if(block->next && block->next->free)
+  {
+    if(block->next->next) {
+      block->next->next->prev = block;
+    }
+    block->size = block->size + block->next->size;
+    block->next = block->next->next;
   }
 }
 
@@ -136,27 +132,37 @@ void mm_free(void *ptr)
  */
 void* mm_realloc(void *old_ptr, size_t new_size)
 {
-  meta_block* old_block = (meta_block*) old_ptr - 1;
-
-  // If new size is 0 then just free the space
-  if(new_size <= 0) {
-    mm_free(old_ptr);
-    return 0;
-  }
-
   // If the pointer is null then this is just a malloc
-  if(old_ptr == NULL) {
+  if(!old_ptr) {
     return mm_malloc(new_size);
   }
 
-  // if the size is the same as the old size then just return the orig pointer.
+  // If new size is 0 then just free the space
+  if(new_size == 0) {
+    mm_free(old_ptr);
+    return old_ptr;
+  }
+
+  meta_block* old_block = (meta_block*) old_ptr - 1;
+
+  // if the requested size is the less than the old size then just return the orig pointer.
+  // TODO: shrink the mem size
   if(old_block->size >= new_size) {
     return old_ptr;
   }
 
-  void* new_ptr = mm_malloc(new_size);
-  memcpy(new_ptr, old_ptr, new_size);
+  if(new_size == 4162) {
+    print_heap();
+  }
 
+
+  void* new_ptr = mm_malloc(new_size);
+
+  if(!new_ptr) {
+    return NULL;
+  }
+
+  memcpy(new_ptr, old_ptr, old_block->size);
   mm_free(old_ptr);
 
   return new_ptr;
@@ -241,6 +247,37 @@ meta_block* request_space(size_t size)
   return block;
 }
 
+void coalesce(meta_block* block)
+{
+  int prev_free = 0;
+  int next_free = 0;
+  if(block->prev)
+    prev_free = block->prev->free;
+  if(block->next)
+    next_free = block->next->free;
+  if(prev_free && next_free)
+  {
+    if(block->next->next)
+      block->next->next->prev = block->prev;
+    block->prev->next = block->next->next;
+    block->prev->size = block->prev->size + block->size + block->next->size;
+  }
+  else if(prev_free)
+  {
+    block->prev->next = block->next;
+    if(block->next)
+      block->next->prev = block->prev;
+    block->prev->size = block->prev->size + block->size;
+  }
+  else if(next_free)
+  {
+    if(block->next->next)
+      block->next->next->prev = block;
+    block->size = block->size + block->next->size;
+    block->next = block->next->next;
+  }
+}
+
 int count_blocks()
 {
   meta_block* current = global_head;
@@ -255,4 +292,15 @@ int count_blocks()
   }
 
   return count;
+}
+
+void print_heap()
+{
+  meta_block* current = global_head;
+  int count = 0;
+  while(current != NULL) {
+    printf("\nBlock %d\tSize: %d", count, current->size);
+    count++;
+    current = current->next;
+  }
 }
