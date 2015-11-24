@@ -54,9 +54,6 @@ meta_block* global_tail = NULL;
 meta_block* find_free_block(size_t size);
 meta_block* request_space(size_t size);
 
-int count_blocks();
-void print_heap();
-
 /*
  * mm_init - initialize the malloc package.
  */
@@ -151,24 +148,6 @@ void* mm_realloc(void *old_ptr, size_t new_size)
     return old_ptr;
   }
 
-  if(new_size == 4162) {
-    print_heap();
-  }
-
-
-  void* new_ptr = mm_malloc(new_size);
-
-  if(!new_ptr) {
-    return NULL;
-  }
-
-  memcpy(new_ptr, old_ptr, old_block->size);
-  mm_free(old_ptr);
-
-  return new_ptr;
-
-
-
   // Otherwise, we will search for a new block that is
   // the big enough and use that spot
   meta_block* free_block = find_free_block(new_size);
@@ -178,11 +157,8 @@ void* mm_realloc(void *old_ptr, size_t new_size)
     // mark the spot as full
     free_block->free = 0;
 
-    // only copy the smallest of the two
-    int copy_size = (old_block->size < new_size)? old_block->size : new_size;
-
     // and copy the data from the old block into the new block
-    memcpy((free_block+1), (old_block + 1), copy_size);
+    memcpy((free_block+1), (old_block + 1), new_size);
 
     // free up the old pointer
     mm_free(old_ptr);
@@ -190,18 +166,20 @@ void* mm_realloc(void *old_ptr, size_t new_size)
     return free_block + 1;
   }
   else {
-    // create a new block
-    void* ptr = mm_malloc(new_size);
+    // we need to create new space
+    void *new_ptr = mm_malloc(new_size);
 
-    if(ptr != NULL) {
-      // then copy the data in place
-      memcpy(ptr, (old_block + 1), new_size);
+    // if mm_malloc did not fail
+    if (!new_ptr) {
+      return NULL;
     }
 
-    // free up the old pointer
+    // copy the old data into the new spot
+    memcpy(new_ptr, old_ptr, old_block->size);
+    // free the old block
     mm_free(old_ptr);
 
-    return ptr;
+    return new_ptr;
   }
 }
 
@@ -247,60 +225,3 @@ meta_block* request_space(size_t size)
   return block;
 }
 
-void coalesce(meta_block* block)
-{
-  int prev_free = 0;
-  int next_free = 0;
-  if(block->prev)
-    prev_free = block->prev->free;
-  if(block->next)
-    next_free = block->next->free;
-  if(prev_free && next_free)
-  {
-    if(block->next->next)
-      block->next->next->prev = block->prev;
-    block->prev->next = block->next->next;
-    block->prev->size = block->prev->size + block->size + block->next->size;
-  }
-  else if(prev_free)
-  {
-    block->prev->next = block->next;
-    if(block->next)
-      block->next->prev = block->prev;
-    block->prev->size = block->prev->size + block->size;
-  }
-  else if(next_free)
-  {
-    if(block->next->next)
-      block->next->next->prev = block;
-    block->size = block->size + block->next->size;
-    block->next = block->next->next;
-  }
-}
-
-int count_blocks()
-{
-  meta_block* current = global_head;
-  int count = 0;
-
-  if(current != NULL) {
-    count = 1;
-    while (current->next != NULL) {
-      count++;
-      current = current->next;
-    }
-  }
-
-  return count;
-}
-
-void print_heap()
-{
-  meta_block* current = global_head;
-  int count = 0;
-  while(current != NULL) {
-    printf("\nBlock %d\tSize: %d", count, current->size);
-    count++;
-    current = current->next;
-  }
-}
